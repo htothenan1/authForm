@@ -4,7 +4,7 @@
   "description": "",
   "main": "app.js",
   "scripts": {
-    "start-dev": "JWT=SECRET_KEY nodemon server.js"
+    "start-dev": "JWT=lebronflops nodemon server.js"
   },
   "repository": {
     "type": "git",

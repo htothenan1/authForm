@@ -4,6 +4,8 @@ const { STRING } = Sequelize;
 const config = {
 	logging: false
 };
+const jwt = require('jsonwebtoken');
+
 
 if (process.env.LOGGING) {
 	delete config.logging;
@@ -15,6 +17,13 @@ const User = conn.define('user', {
   password: STRING,
 });
 
+const Note = conn.define('note', {
+  text: STRING
+})
+
+User.hasMany(Note)
+Note.belongsTo(User)
+
 User.addHook('beforeCreate', async(user) => {
   if (user.changed('password')){
     user.password = await bcrypt.hash(user.password, 3);
@@ -23,7 +32,8 @@ User.addHook('beforeCreate', async(user) => {
 
 User.byToken = async (token) => {
 	try {
-		const user = await User.findByPk(token);
+    const decoded = await jwt.verify(token, process.env.JWT) 
+		const user = await User.findByPk(decoded.userId);
 		if (user) {
 			return user;
 		}
@@ -38,14 +48,17 @@ User.byToken = async (token) => {
 };
 
 User.authenticate = async ({ username, password }) => {
+
 	const user = await User.findOne({
 		where: {
-			username,
-			password
-		}
+			username
+	}
 	});
-	if (user) {
-		return user.id;
+
+	if (bcrypt.compare(password, user.password)) {
+		const token = jwt.sign({ userId: user.id }, process.env.JWT);
+    console.log(token)
+    return token
 	}
 	const error = Error('bad credentials');
 	error.status = 401;
@@ -61,6 +74,13 @@ const syncAndSeed = async () => {
 		{ username: 'larry', password: 'larry_pw' }
 	];
 	const [ lucy, moe, larry ] = await Promise.all(credentials.map((credential) => User.create(credential)));
+  const notes = [ 
+    { text: 'hello world'}, 
+    { text: 'reminder to buy groceries'}, 
+    { text: 'reminder to do laundry'} ];
+  const [ note1, note2, note3 ] = await Promise.all(notes.map( note => Note.create(note)));
+  await lucy.setNotes(note1);
+  await moe.setNotes([note2, note3]);
 	return {
 		users: {
 			lucy,
